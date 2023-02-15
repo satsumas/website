@@ -296,11 +296,13 @@ I'll briefly recap what classifier free guidance does. Let's begin with classifi
 
 To see what classifier guidance does, let's recap what a conditional diffusion model like stable diffusion does.
 
-It's easyiest to start from inference. At inference time, when you ask your model to produce an image in response to your prompt, the model is actually forming 
+It's easiest to start from inference. At inference time, when you ask your model to produce an image in response to your prompt, the model is running a reverse diffusion process to form an image from noise. The problem is set up as removing the noise in increments: $x_{T}$ is pure noise, $x_{0}$ is noiseless, and for each $t \in [0, T]$, $x_{t-1}$ is slightly less noisy version than $x_{t}$. We are able to do this denoising because the model is trained to denoise images.
 
-During training the diffusion model learns to remove the noise from images to which Gaussian noise has been applied by learning to predict the (Gaussian parameters of) the noise. The problem is set up as removing the noise in increments: $x_{T}$ is pure noise, $x_{0}$ is noiseless, and for each $t \in [0, T]$, $x_{t-1}$ is slightly less noisy version than $x_{t}$. We want to predict $x_{t-1}$ from $x_{t}$. We say that $\epsilon_{\theta}(x_{t})$ is the function that predicts the noise at $t$.
+It is intractable to compute the probability of $x_{t-1}$ given $x_{t}$ because it depends on the entire dataset. However, we can train a model $\epsilon_{\theta}(x_{t})$ that approximates these conditional probabilities. 
 
-How do we sample from $\epsilon_{\theta}(x_{t})$? To do this, we model the distribution of noisy-images $x_{t-1}$, as a Gaussian distribution, $p_{\theta}(x_{t-1}|x_{t})$. We sample from this distribution to denoise some pure noise into an image at inference time. In particular, we're looking for how changing $x$ affects log $p_{\theta}(x_{t-1}|x_{t})$. There is just one additional detail: we're using a conditional diffusion model, which is to say, denoising is conditional on some text prompt $y$. So we are actually dealing with the conditional probability $p_{\theta}(x_{t-1}|x_{t}, y)$.
+In training, the model is shown random pairs of noised images, $x_{t}$ and timesteps $t$, and it learns predict the noise, $\epsilon_{t}$ which is equivalent to predicting the denoised image $x_{t-1}$ from $x_{t}$ and timestep $t$. This is the denoising model. While $\epsilon_{t}$ is the model, $p_{\theta}(x_{t})$  is the probability distribution of the model's outputs. There is just one additional detail: we're considering _conditional_ diffusion models, which is to say, denoising is conditioned on some text prompt $y$. So we are actually dealing with the conditional probability $p_{\theta}(x_{t}|y, t)$.
+Under certain assumptions, the distribution $p_{\theta}$ is a Gaussian. You can read more of the details in [Lilian Weng's blog post on diffusion models](https://lilianweng.github.io/posts/2021-07-11-diffusion-models/#reverse-diffusion-process). In the remainder, we'll follow the notational convention of suppressing the timestep annotations, and assume for each timestep $t$ a function $p_{\theta}(x|y) = p_{\theta}(x_{t}|y, t)$
+
 
 The insight of classifier guidance is that we can modify the sampling process from $p_{\theta}$ in such a way that the resulting image is more closely aligned to the prompt.
 
@@ -308,34 +310,45 @@ The way that this works in practice involves mixing in an additional factor, par
 
 Let's see why a classifier gives us something helpful in sampling from the diffusion model.
 
-In simple terms, we want to know how much the log-probability of an image $x$ given $y$ changes when we change $x$. This is the gradient of the log-probability, $ \nabla_{x} log p(x|y)$. Then we can iteratively move towards such an x.
+In simple terms, we want to know how much the log-probability of an image $x$ given $y$ changes when we change $x$. This is the gradient of the log-probability, $ \nabla_{x} log p_{\theta}(x|y)$. Then we can iteratively move towards such an x.
 
-We can apply Bayes rule to rewrite the score function as follows:
-$$p(x|y) = \frac{p(y|x).p(x)}{p(y)} \newline$$
+The score function, which is what is optimised at inference time, [[[IS IT???]]] approximates $ \nabla_{x} log p_{\theta}(x|y)$.
+
+
+We can apply Bayes rule to rewrite the score function as equation (*) below: 
+
+$p_{\theta}(x|y) = \frac{p_{\theta}(y|x).p_{\theta}(x)}{p_{\theta}(y)} \newline$
+
+
 Then, taking gradients w.r.t. $x$, and distributing the log:
-$\Rightarrow \nabla_{x} log p(x|y) = \nabla_{x} log \frac{p(y|x).p(x)}{p(y)} \newline
-\Rightarrow \nabla_{x} log p(x|y) = \nabla_{x}log (p(y|x)) + \nabla_{x} log(p(x)) - \nabla_{x} log(p(y)) \newline
-\Rightarrow \nabla_{x} log p(x|y) = \nabla_{x}log (p(y|x)) + \nabla_{x} log(p(x)) \newline$
-Since $p(y)$ is not a function in x, its gradient w.r.t. $x$ is 0.
 
-Notice that via the rearrangement above, we are expressing the conditional probability $log(p(x|y))$ in terms of the unconditional probability $log(p(x))$ and the term $log(p(y|x))$, the probability of the conditioning class label $y$ given the data $x$. But $p(y|x)$ just the thing that a vanilla classification model learns: the probability of the label given the data. In this way, the diffusion model's score function can be expressed in terms of an unconditional probability and a classifier.
+$\Rightarrow \nabla_{x} log p_{\theta}(x|y) = \nabla_{x} log \frac{p_{\theta}(y|x).p_{\theta}(x)}{p_{\theta}(y)} \newline$
+$\Rightarrow \nabla_{x} log p_{\theta}(x|y) = \nabla_{x}log (p_{\theta}(y|x)) + \nabla_{x} log(p_{\theta}(x)) - \nabla_{x} log(p_{\theta}(y)) \newline$
+$\Rightarrow \nabla_{x} log p_{\theta}(x|y) = \nabla_{x}log (p_{\theta}(y|x)) + \nabla_{x} log(p_{\theta}(x))   \space \space\space \space\space \space (*) \newline$ 
+Since $p_{\theta}(y)$ is not a function in x, its gradient w.r.t. $x$ is 0.
+
+Notice that via the rearrangement above, we are expressing the gradient of the conditional probability $log(p_{\theta}(x|y))$ in terms of the gradients of the _unconditional probability_ $log(p_{\theta}(x))$ and the _classifier_ $log(p_{\theta}(y|x))$.
+It is a classifier because it is just the thing that a vanilla classification model learns: the probability of the label given the data. In this way, the diffusion model's score function can be decomposed into an unconditional probability and a classifier.
 
 
-Classifier guidance tweaks the score function, to introduce a coefficient $s$ controlling the classifier term $\nabla_{x}log (p(y|x))$. Equivalently, this can be thought of as perturbing the mean of the Gaussian distribution modeling the denoising process.
+Classifier guidance tweaks the score function, to introduce a coefficient $s$ controlling the classifier term $\nabla_{x}log (p_{\theta}(y|x))$. This modification can be equivalently interpreted as perturbing the mean of the Gaussian distribution $p_{\theta}$ models; for details see Nichol et al (2022).
 
-What is the effect on model outputs of varying $s$? Well, we know that $s\nabla_{x}log (p(y|x)) = \nabla_{x} log \frac{1}{Z}p(y|x)^{s}$ for a constant $Z$. This is to say, multiplying the log probability of $y$ given $x$ by $s$ is proportional to raising the renormalised log probability to the power $s$. And this exponentiation has the effect of disproportionately increasing its larger values, amplifying the modes of the distribution. So, for $s>1$, the $x$ that maximises $s\nabla_{x}log (p(y|x)) + \nabla_{x} log(p(x))$ will be closer to the mode of the distribution $p(y|x)$, so closer to the class label $y$.
+So, what is the effect on our model outputs of varying $s$ in the new score function? Well, we know that $s\nabla_{x}log (p_{\theta}(y|x)) = \nabla_{x} log \frac{1}{Z}p_{\theta}(y|x)^{s}$ for a constant $Z$. This is to say, multiplying the log probability of $y$ given $x$ by $s$ is proportional to raising the renormalised log probability to the power $s$. And this exponentiation has the effect of disproportionately increasing its larger values, amplifying the modes of the distribution. So, for $s>1$, the $x$ that maximises $s\nabla_{x}log (p_{\theta}(y|x)) + \nabla_{x} log(p_{\theta}(x))$ will be closer to the mode of the distribution $p_{\theta}(y|x)$, so closer to the class label $y$.
 
-This is why classifier guidance is known to have the effect of boosting the fidelity of diffusion model outputs at the expense of diversity. 
+This is why classifier guidance is known to have the effect of boosting the fidelity of diffusion model outputs at the expense of diversity. And it is called classifier guidance because you are guiding the score function closer to the modes of a classifier based on the prompt.
 
-Classifier free guidance (Ho & Salimans (2021)) is a development of classifier guidance. It pushes the model in the same direction, but avoids the need to train a specialised classifier.
+Note that in order to apply the modified score function in practice, you need to obtain a classifier $p_{\theta}(y|x)$, which is a model trained on noisy inputs to predict the Imagenet classes. [TODO -- is classifier really referred to as p-sub-theta or does it deserve own distro annotation?]
+
+Classifier free guidance (Ho & Salimans (2021)) is a development of classifier guidance. It pushes the model in the same direction as classifier guidance, but avoids the need to train a specialised classifier.
 
 To use  classifier-free guidance, during training we replace the label $y$ in a condional diffusion model with a null label, $\emptyset$, a fixed proportion of the time, typically 10-20%. 
 
-Recall that the de-noising process is modeled by $\epsilon_{\theta}(x_{t}|y)$. We replace this with $\hat{\epsilon}_{\theta}(x_{t}|y)$ as follows:
+Recall that the de-noising process is modeled by $\epsilon_{\theta}(x_{t}|y)$. We replace this with $\hat{\epsilon}_{\theta}(x_{t}|y)$, a weighted combination of the original conditional denoising model and an unconditional denoising model as follows:
 
 $$\hat{\epsilon}_{\theta}(x_{t}|y) = \epsilon_{\theta}(x_{t}|\emptyset) + s(\epsilon_{\theta}(x_{t}|y) - \epsilon_{\theta}(x_{t}|\emptyset)$$
 
-As $s$ increases, the 
+For $s=0$, $\hat{\epsilon}_{\theta}$ is just the unconditional denoising model, and for $s=1$, it is the original conditional denoising model. But as $s>1$ increases, the model is pushed towards the conditional model.
+
 
 I used stable-diffusion v1.4, which was trained with [10% text-conditioning dropout](https://huggingface.co/CompVis/stable-diffusion-v1-4), allowing me to use classifier-free guidance at inference time to push the denoising process even more strongly towards the conditioning $y$, which for me, is my new `brian_wildsmith` pseudo-word.
 
