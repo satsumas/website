@@ -212,13 +212,13 @@ Classifier free guidance (Ho & Salimans (2021)) is a development of classifier g
 To use  classifier-free guidance, during training we replace the label $y$ in a condional diffusion model with a null label, $\emptyset$, a fixed proportion of the time, typically 10-20%. 
 
 
-Recall that the de-noising process is modeled by $\epsilon_{\theta}(x_{t}\vert y)$. We replace this with $\hat{\epsilon}_{\theta}(x_t \vert y)$, a weighted combination of the original conditional denoising model and an unconditional denoising model as follows:
+Recall that the de-noising process is modeled by $\epsilon_{\theta}(x_{t}\vert y)$. We replace this with $\widehat{\epsilon}_{\theta}(x_t \vert y)$, a weighted combination of the original conditional denoising model and an unconditional denoising model as follows:
 
 
-$$\hat{\epsilon}_{\theta}(x_{t}\vert y) = \epsilon_{\theta}(x_{t}\vert \emptyset) + s(\epsilon_{\theta}(x_{t}\vert y) - \epsilon_{\theta}(x_{t}\vert \emptyset))$$
+$$\widehat{\epsilon}_{\theta}(x_{t}\vert y) = \epsilon_{\theta}(x_{t}\vert \emptyset) + s(\epsilon_{\theta}(x_{t}\vert y) - \epsilon_{\theta}(x_{t}\vert \emptyset))$$
 
 
-For $s=0$, $\hat{\epsilon}_{\theta}$ is just the unconditional denoising model, and for $s=1$, it is the original conditional denoising model. But as $s>1$ increases, the model is a mixture of the conditional and unconditional, increasingly weighted towards the conditional model.
+For $s=0$, $\widehat{\epsilon}_{\theta}$ is just the unconditional denoising model, and for $s=1$, it is the original conditional denoising model. But as $s>1$ increases, the model is a mixture of the conditional and unconditional, increasingly weighted towards the conditional model.
 
 
 I used stable-diffusion v1.4, which was trained with [10% text-conditioning dropout](https://huggingface.co/CompVis/stable-diffusion-v1-4), allowing me to use classifier-free guidance at inference time to push the denoising process even more strongly towards the conditioning $y$, which for me, is my new `brian_wildsmith` pseudo-word.
@@ -233,7 +233,7 @@ With some theory under our belts, let's end with one more example. This is for t
 
 There are 50 frames for each $s$-incremement of 1, so 50 frames from the beginning we see the results for $s=1$. This corresponds to the image about 8 seconds in: not discernibly a bird, but just before the turning point at which a bird sharply emerges. This is when the score function is
 
-$$\hat{\epsilon}_{\theta}(x_{t}\vert y) = \epsilon_{\theta}(x_{t}\vert \emptyset) + s(\epsilon_{\theta}(x_{t}\vert y) - \epsilon_{\theta}(x_{t}\vert \emptyset))= \epsilon_{\theta}(x_{t}\vert y)$$
+$$\widehat{\epsilon}_{\theta}(x_{t}\vert y) = \epsilon_{\theta}(x_{t}\vert \emptyset) + s(\epsilon_{\theta}(x_{t}\vert y) - \epsilon_{\theta}(x_{t}\vert \emptyset))= \epsilon_{\theta}(x_{t}\vert y)$$
  
 
 That is, at $s=1$ the score function is just the conditional denoising model score function.
