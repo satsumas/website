@@ -212,7 +212,7 @@ Classifier free guidance (Ho & Salimans (2021)) is a development of classifier g
 To use  classifier-free guidance, during training we replace the label $y$ in a condional diffusion model with a null label, $\emptyset$, a fixed proportion of the time, typically 10-20%. 
 
 
-Recall that the de-noising process is modeled by $\epsilon_{\theta}(x_{t}\vert y)$. We replace this with $\hat{\epsilon}_{\theta}(x_{t}\vert y)$, a weighted combination of the original conditional denoising model and an unconditional denoising model as follows:
+Recall that the de-noising process is modeled by $\epsilon_{\theta}(x_{t}\vert y)$. We replace this with $\hat{\epsilon}_{\theta}(x_t \vert y)$, a weighted combination of the original conditional denoising model and an unconditional denoising model as follows:
 
 
 $$\hat{\epsilon}_{\theta}(x_{t}\vert y) = \epsilon_{\theta}(x_{t}\vert \emptyset) + s(\epsilon_{\theta}(x_{t}\vert y) - \epsilon_{\theta}(x_{t}\vert \emptyset))$$
