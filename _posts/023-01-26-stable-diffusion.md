@@ -143,34 +143,40 @@ Using 16 vectors per token (sadly the cat image was a victim of the cropping iss
 
 
 ## Classifier-free guidance for style transfer
-One parameter I experimented with was the value controlling classifier free guidance. Classifier free guidance is a technique for varying the closeness with which the generated results adhere to the prompt. I wanted to understand what this means in the context of style transfer. In Automatic1111's web UI, this parameter is `cfg_scale`.
+One parameter I experimented with was the value controlling classifier-free guidance. Classifier free guidance is a technique that can be applied at inference time to control the closeness with which the generated results adhere to the prompt. I wanted to understand what exactly classifier-free guidance is doing in the context of style transfer, both in terms of the mathematics and the visual results. In Automatic1111's web UI, this parameter is `cfg_scale`.
 
-To show the effect on varying `cfg_scale`, see the sequence of images below, for `cfg_scale` ranging from 0 and 30 with a fixed seed. The model was prompted to draw a city of tents in the desert under a full moon, in Wildsmith's style. I think this reveals that `cfg_scale` isn't having all that much effect on the quality of the generated image, once it gets past about 1, except for a few mid-range values where it fails to render the moon. Otherwise, it's just gently exploring a set of similar points in the space.
+To show the effect of varying the classifier-free guidance scale, see the sequence of images below, for values ranging from 0 and 30 using a fixed seed. The model was prompted to draw a city of tents in the desert under a full moon, in Wildsmith's style. It's immediately noticable that while results for inital values in [0,1] don't resemble the prompt, after this the model is gently exploring a set of similar points in the space.
 
 
 <div class="gallery" data-columns="1">
     <img src="https://storage.googleapis.com/hodesdon-com/tent_city.gif">
 </div>
 
-This time, a house with a mountain range in the background. The image flickers between different placements of the house, leaving it out altogether for large `cfg_scale` values.
+This time, a house with a mountain range in the background. The image flickers between different placements of the house, leaving it out altogether for large classifier-free guidance scale values. Both of these quick experiments suggest that there is no benefit to tuning the classifier-free guidance scale beyond a certain point.
 
 <div class="gallery" data-columns="1">
     <img src="https://storage.googleapis.com/hodesdon-com/mountain_range.gif">
 </div>
 
-I'll briefly recap what classifier free guidance does. Let's begin with classifier guidance, introduced by Dhariwal and Nichol (2021) as the method that gave diffusion models the edge over GANs in image synthesis. I found [Beanne's blog post](https://benanne.github.io/2022/05/26/guidance.html) on guidance gave a careful motivation for the methods, and  [Lilian Weng's blog post](https://lilianweng.github.io/posts/2021-07-11-diffusion-models/#reverse-diffusion-process) covered the maths. This post builds on their accounts by including concrete examples of varying the classifier free guidance values.
+The method of classifier-free guidance developed from an earlier method, classifier guidance. This was introduced by Dhariwal and Nichol (2021) and was the technique that gave diffusion models the edge over GANs in image synthesis. I found [Sander Dieleman blog post](https://benanne.github.io/2022/05/26/guidance.html) on guidance gave a careful motivation for the methods, and  [Lilian Weng's blog post](https://lilianweng.github.io/posts/2021-07-11-diffusion-models/#reverse-diffusion-process) covered the maths. This post builds on their accounts by including concrete examples of varying the classifier free guidance values.
 
-To see what classifier guidance does, let's recap what a conditional diffusion model like stable diffusion does. The trick to understanding the model is to see that what we are modeling -- images -- are sampled from a probability distribution $q(x)$, albeit an extremely complex one. Images are not noise, as they have a structure, which can be represented by a distribution. We can also consider a noising process, called forward diffusion, in which we add incremental amounts of Gaussian noise to an image $x_{0}$ drawn from $q(x)$, giving us a sequence $x_{t}$ for $t\in[0, T]$ such that $x_{T}$ is pure noise. If we had access to $q$, we could take a sample of pure noise and apply reverse diffusion, denoising it back to content, by estimating $q(x_{t}\vert x_{t+1})$. This is not possible, however, since $q$ depends on the entire dataset of images and is therefore intractable to compute.
+To see what classifier guidance does, let's recap what exactly a conditional diffusion model like stable diffusion does. The trick to understanding the model is to see that what we are modeling -- images -- are sampled from a probability distribution $q(x)$, albeit an extremely complex one. Images are not noise; they have a structure, and this can be described by a distribution. We can also consider a noising process, called forward diffusion, in which we add incremental amounts of Gaussian noise to an image $x_{0}$ drawn from $q(x)$, giving us a sequence $x_{t}$ for $t\in[0, T]$ such that $x_{T}$ ends up being pure noise. If we had access to $q$, we could take a sample of this pure noise and apply the reverse of the diffusion process, denoising it back to content, by estimating $q(x_{t}\vert x_{t+1})$. This is not possible, however, since $q$ depends on the entire dataset of images and is therefore intractable to compute.
 
 
-What we can do is to train a model that approximates these conditional probabilities $q(x_{t}\vert x_{t+1})$.. Call this model $p_{\theta}(x_{t} \vert x_{t+1})$. Under certain assumptions, the distribution $p_{\theta}$ is a Gaussian. There is an additional detail: we're considering _conditional_ diffusion models, which is to say, denoising is conditioned on some text prompt. We don't just want our denoising process to reveal some image in the underlying distribution $q(x)$, but rather to reveal the image most closely aligned with a given text prompt, $y$. This means we are in fact dealing with the conditional probability $p_{\theta}(x_{t}\vert y,t)$, which can be also approximated by a Gaussian. In practice, diffusion models approximate $\nabla_{x}log(p_{\theta}(x \vert y))$, the 'score function' of the distribution, rather than the distribution itself. 
+What we can do is to train a model that approximates these conditional probabilities $q(x_{t}\vert x_{t+1})$. Call this model $p_{\theta}(x_{t} \vert x_{t+1})$. Under certain assumptions, the distribution $p_{\theta}$ is a Gaussian. So now we can denoise images to get them back to noiselessness.
 
-Distribution $p_{\theta}$ gives rise to an associated denoising model $\epsilon_{\theta}(x_{t}, y)$, which predicts the noise at timestep $t$ given the prompt $y$ and the image $x_{t}$, which is equivalent to predicting the incrementally denoised image $x_{t-1}$.
+There is an additional hurdle: we would like to use a _conditional_ diffusion model. This is to say, we want the denoising to be conditioned on some text prompt. We don't just want our denoising process to reveal any image that looks like it came from the underlying distribution $q(x)$, but rather to reveal the image most closely aligned with a given text prompt, $y$. This means we are in fact dealing with the conditional probability $p_{\theta}(x_{t}\vert x_{t+1}, y)$, which can be also approximated by a Gaussian. In practice, diffusion models approximate $\nabla_{x}log(p_{\theta}(x \vert y))$, the 'score function' of the distribution, rather than the distribution itself. 
+
+Distribution $p_{\theta}$ gives rise to an associated denoising model $\epsilon_{\theta}(x_{t+1}, y)$, which predicts the noise at timestep $t$ given the prompt $y$ and the image $x_{t+1}$, which is equivalent to predicting the incrementally denoised image $x_{t}$.
+
+So, how do we use the unconditional denoising model to generate images? This is explained in the following section.
 
 ### Conditional reverse diffusion
-Sampling from a conditional denoising model is possible given an additional classifier model trained on noisy versions of $x$ and grouped into classes $y$. Dhariwal and Nichol, reason as follows: suppose first that we have a conditional Markovian noising process $\widehat{q}$, such that $\widehat{q}(y|x_{0})$ is a known label distribution for each sample. If this sounds familiar, it should: it's exactly what you would get out of a softmax function at the end of a regular classifier model over classes $y$. Dhariwal and Nichol establish that $\widehat{q}(y|x_{t+1} \vert x_{t}) = \widehat{q}(y|x_{t+1} \vert x_{t}, y)$, which is just to say that the distribution doesn't change whether or not it is conditioned on $y$. And they also prove, using the fact that $\widehat{q}(y|x_{0}) = q(y|x_{0})$, that $\widehat{q}(y|x_{t}) = q(y|x_{t})$. For the full derivation see Appendix H of the paper. Using these identities, and repeated applications of the multiplucation rule of probability, they can then establish that:
+Sampling from a conditional denoising model is possible given an additional classifier model trained on noisy versions of $x$ labeled with classes $y$. Dhariwal and Nichol, reason as follows: suppose first that we have a conditional Markovian noising process $\widehat{q}$, such that $\widehat{q}(y|x_{0})$ is a known label distribution for each sample. If this sounds familiar, it should: it's exactly what you would get out of a softmax function at the end of a regular classifier model over classes $y$. Dhariwal and Nichol establish that $\widehat{q}(y|x_{t+1} \vert x_{t}) = \widehat{q}(y|x_{t+1} \vert x_{t}, y)$, which is just to say that the distribution doesn't change whether or not it is conditioned on $y$. And they also prove, using the fact that $\widehat{q}(y|x_{0}) = q(y|x_{0})$, that $\widehat{q}(y|x_{t}) = q(y|x_{t})$. For the full derivation see Appendix H of the paper. Using these identities, and repeated applications of the multiplucation rule of probability, they can then establish that:
 
-$\widehat{q}(y \vert x_{t+1}, y ,x_{t}) = \frac{\widehat{q}(x_{t}, x_{t+1}, y)}{\widehat{q}(x_{t+1}, y)}$
+$\widehat{q}(x_{t} \vert x_{t+1}, y)$
+
+$= \frac{\widehat{q}(x_{t}, x_{t+1}, y)}{\widehat{q}(x_{t+1}, y)}$
 
 $= \frac{\widehat{q}(x_{t}, x_{t+1}, y)}{\widehat{q}(y \vert x_{t+1}) \widehat{q}(x_{t+1})}$
 
@@ -180,17 +186,15 @@ $= \frac{\widehat{q}(x_{t} \vert x_{t+1})  \widehat{q}(y \vert x_{t}) } {\wideha
 
 $= \frac{q(x_{t} \vert x_{t+1})  \widehat{q}(y \vert x_{t}) } {\widehat{q}(y \vert x_{t+1})}$ by previously established identity
 
-$= Z q(x_{t} \vert x_{t+1})  \widehat{q}(y \vert x_{t})$ 
-
-Since $\widehat{q}(y \vert x_{t+1}$ does not depend on $x_t$, we can treat it as a constant $\frac{1}{Z}$.
+$= Z q(x_{t} \vert x_{t+1})  \widehat{q}(y \vert x_{t})$, since $\widehat{q}(y \vert x_{t+1})$ does not depend on $x_t$, we can treat it as a constant $\frac{1}{Z}$.
 
 Since $p_{\theta}(x_{t} \vert x_{t+1})$ approximates $q(x_{t} \vert x_{t+1})$, we have
 
 $\widehat{q}(y \vert x_{t+1}, y ,x_{t}) \approx p_{\theta}(x_{t} \vert x_{t+1}) \widehat{q}(y \vert x_{t})$. 
 
-And we can, as mentioned above, easily train a classifier to give us $\widehat{q}(y \vert x_{t})$. As we can therefore compute both factors of the left hand side, we can sample from the conditional reverse diffusion process $\widehat{q}(y \vert x_{t+1}, y ,x_{t})$.
+And we can, as mentioned in the previous paragraph, easily train a classifier to give us $\widehat{q}(y \vert x_{t})$. As we can therefore compute both factors of the left hand side, we can sample from the conditional reverse diffusion process $\widehat{q}(y \vert x_{t+1}, y ,x_{t})$.
 
-OK, so that is an overview of how conditional diffusion models work. For the rest of the section we'll follow the notational convention of suppressing the timestep annotations, and assume for each timestep $t$ a function $p_{\theta}(x\vert y) = p_{\theta}(x_{t}\vert y,t)$
+OK, so that is an overview of how conditional diffusion models work. For the rest of the section we'll follow the notational convention of suppressing the timestep annotations, and assume for each timestep $t$ a function $p_{\theta}(x\vert y) = p_{\theta}(x_{t}\vert x_{t+1}, y)$
 
 The insight of classifier guidance is that we can modify the score function of the noise predictor $\epsilon_{\theta}$ in such a way that the denoised images produced at inference time are more closely aligned to the prompt. This works by introducing a scalar coefficient controlling one factor (the classifier term) of the score function.
 
@@ -207,19 +211,15 @@ $\Rightarrow\nabla_{x}log(p_{\theta}(x\vert y)) = \nabla_{x}log \frac{p_{\theta}
 
 $\Rightarrow \nabla_{x} log(p_{\theta}(x\vert y)) = \nabla_{x}log(p_{\theta}(y\vert x)) + \nabla_{x} log(p_{\theta}(x)) - \nabla_{x} log(p_{\theta}(y))$
 
-$\Rightarrow \nabla_{x} log(p_{\theta}(x\vert y)) = \nabla_{x}log (p_{\theta}(y\vert x)) + \nabla_{x} log(p_{\theta}(x))   \space \space\space \space\space \space (*)$ 
-
-Since $p_{\theta}(y)$ is not a function in x, its gradient w.r.t. $x$ is 0.
+$\Rightarrow \nabla_{x} log(p_{\theta}(x\vert y)) = \nabla_{x}log (p_{\theta}(y\vert x)) + \nabla_{x} log(p_{\theta}(x))   \space \space\space \space\space \space$, since $p_{\theta}(y)$ is not a function in x, its gradient w.r.t. $x$ is 0.
 
 Notice that via the rearrangement above, we are expressing the gradient of the conditional probability $log(p_{\theta}(x\vert y))$ in terms of the gradients of the _unconditional probability_ $log(p_{\theta}(x))$ and the _classifier_ $log(p_{\theta}(y\vert x))$. It is a classifier because it is just the thing that a vanilla classification model learns: the probability of the label given the data. In this way, the diffusion model's score function can be decomposed into an unconditional probability and a classifier.
 
-Classifier guidance tweaks the score function, to introduce a coefficient $s$ controlling the classifier term $\nabla_{x}log (p_{\theta}(y\vert x))$.
-
-So, what is the effect on our model outputs of varying $s$ in the new score function? Well, we know that $s\nabla_{x}log (p_{\theta}(y\vert x)) = \nabla_{x} log \frac{1}{Z}p_{\theta}(y\vert x)^{s}$ for a constant $Z$. This is to say, multiplying the log probability of $y$ given $x$ by $s$ is proportional to raising the renormalised log probability to the power $s$. And this exponentiation has the effect of disproportionately increasing its larger values, amplifying the modes of the distribution, which are the values that maximise the probability density function. So, for $s>1$, the $x$ that maximises $s\nabla_{x}log (p_{\theta}(y\vert x)) + \nabla_{x} log(p_{\theta}(x))$ will be closer to the mode of the distribution $p_{\theta}(y\vert x)$, so closer to the class label $y$.
+Classifier guidance tweaks the score function, to introduce a coefficient $s$ controlling the gradients of the classifier term $\nabla_{x}log (p_{\theta}(y\vert x))$.So, what is the effect on our model outputs of varying $s$ in the new score function? Well, we know that $s\nabla_{x}log (p_{\theta}(y\vert x)) = \nabla_{x} log \frac{1}{Z}p_{\theta}(y\vert x)^{s}$ for a constant $Z$. This is to say, multiplying the log probability of $y$ given $x$ by $s$ is proportional to raising the renormalised log probability to the power $s$. And this exponentiation has the effect of disproportionately increasing its larger values, amplifying the modes of the distribution, which are the values that maximise the probability density function. So, for $s>1$, the $x$ that maximises $s\nabla_{x}log (p_{\theta}(y\vert x)) + \nabla_{x} log(p_{\theta}(x))$ will be closer to the mode of the distribution $p_{\theta}(y\vert x)$, so closer to the class label $y$.
 
 This is why classifier guidance is known to have the effect of boosting the fidelity of diffusion model outputs at the expense of diversity. As the name classifier guidance suggests, it is used to guide the score function closer to the modes of a classifier based on the prompt. Note that in order to apply the modified score function in your model, you need a classifier trained on noisy images to predict classes, typically the Imagenet classes.
 
-Classifier free guidance (Ho & Salimans, 2021) is a development of classifier guidance. It pushes the model in the same direction as classifier guidance, but avoids the need to train a specialised classifier.
+Classifier-_free_ guidance (Ho & Salimans, 2021) is a development of classifier guidance. It pushes the model in the same direction as classifier guidance, but avoids the need to train a specialised classifier.
 
 To use  classifier-free guidance, during training we replace the label $y$ in a conditonal diffusion model with a null label, $\emptyset$, a fixed proportion of the time, typically 10-20%. Recall that the de-noising process is modeled by $\epsilon_{\theta}(x_{t}\vert y)$. We replace this with $\widehat{\epsilon}_{\theta}(x_t \vert y)$, a weighted combination of the original conditional denoising model and an unconditional denoising model as follows:
 
@@ -245,19 +245,21 @@ There are 50 frames for each $s$-incremement of 1, so 50 frames from the beginni
 $$\widehat{\epsilon}_{\theta}(x_{t}\vert y) = \epsilon_{\theta}(x_{t}\vert \emptyset) + s(\epsilon_{\theta}(x_{t}\vert y) - \epsilon_{\theta}(x_{t}\vert \emptyset))= \epsilon_{\theta}(x_{t}\vert y)$$
  
 
-That is, at $s=1$ the score function is just the conditional denoising model score function.
-Prior to this point, the images resemble a portrait of a woman: clearly not noise, but not an image that is conditioned on the prompt either. 
+That is, at $s=1$ the score function is just the conditional denoising model score function -- the function we wanted to improve on by introducing classifier, and then classifier-free, guidance.
+Prior to this point, the images resemble a portrait of a woman: not noise, but not an image that is conditioned on the prompt either. 
 There is another jump in form 32 seconds in, which is when $s=4$. Beyond this, some more Wildsmith-like detail is added, but in general $s>10$ yields minor variations on the result with no particular improvement in quality or prompt-closeness.
 
+
+
 # Textual inversion for bias reduction
-Finally, I wanted to flag a use case of textual inversion that I haven't seen discussed beyond the original paper. It is well known that generative models reproduce the biases of their training data. For instance, the prompts 'doctor' and 'scientist' disproportionately produce images that resemble men. This reflects biases in the kind of images that are uploaded to image hosting sites where the training data is collected from.
+Finally, I wanted to flag a use case of textual inversion that I haven't seen discussed beyond the original paper by Gal et al. It is well known that generative models reproduce the biases of their training data. For instance, the prompts 'doctor' and 'scientist' disproportionately produce images that resemble men. This reflects biases in the kind of images that are uploaded to image hosting sites where the training data is collected from.
 
 When DALL-E2 was first released, this bias recieved a lot of attention and OpenAI [scrambled to release a patch](https://openai.com/blog/reducing-bias-and-improving-safety-in-dall-e-2/) that would force the model to produce more diverse images.
-The first pass solution was extremely hacky. It consisted of silently adding a keyword from a list of minority groups (such as 'female', 'black') to the  prompt, as [users quickly discovered](https://twitter.com/rzhang88/status/1549472829304741888) by prompting the model with "A doctor holding a sign that says", and observing the keyword printed on the sign in the generated image. This phenomenon isn't reproducible in current versions, so clearly OpenAI have a more robust solution now. A far better solution would be to fix the training set. But retraining is computationally expensive.
+The first pass solution was extremely hacky. It consisted of silently adding a keyword from a list of minority groups (such as 'female', 'black') to the  prompt, as [users quickly discovered](https://twitter.com/rzhang88/status/1549472829304741888) by prompting the model with "A doctor holding a sign that says", and observing the keyword printed on the sign in the generated image. This phenomenon isn't reproducible in current versions, so clearly OpenAI have a more robust solution now. One solution would be to fix the training set. But retraining is computationally expensive.
 
 As the authors of the textual inversion paper suggest, we can use the technique to update a trained model's understanding of words already in its vocabulary. Rather than using a novel token, as we do when adding a style or object to the model's vocabulary, we overwrite the embedding of an existing token, training on a small, curated set of images. 
 
-The compute budget to do this is negligible relative to training the base model. My textual inversion above ran in about 4 hours on a GeForce GTX 1080, whereas the initial training of stable diffusion was 150,000 GPU hours on the considerably more FLOP-heavy A100. So this seems like an elegant and practical tool in the toolbelt to use in countering bias.
+The compute budget to do this is negligible relative to training the base model. My textual inversion above ran in about 4 hours on a GeForce GTX 1080, whereas the initial training of stable diffusion was 150,000 GPU hours on the considerably more FLOP-heavy A100. This suggests that textual inversion is an elegant and practical tool in the toolbelt to use in countering bias.
 
 ## References
 
