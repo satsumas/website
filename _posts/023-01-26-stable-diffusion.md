@@ -233,11 +233,10 @@ For $s=0$, $\widehat{\epsilon}_{\theta}$ is just the unconditional denoising mod
 The version of stable diffusion I used, `v1.4`, was trained with [10% text-conditioning dropout](https://huggingface.co/CompVis/stable-diffusion-v1-4), allowing me to use classifier-free guidance at inference time to push the denoising process even more strongly towards the conditioning $y$, which for me, is my new `brian_wildsmith` pseudo-word.
 
 
-Now we have some theory under our belts, let's end with one more example. This is for the prompt 'dove in the style of brian_wildsmith'. In this series of results, the classifier guidance scale ranges from 0 to 30, increasing in increments of $0.02s$, an order of magnitude smaller than in the gifs above. 
+Now we have some theory under our belts, let's end with two more examples. Below are the results for the prompt 'dove in the style of brian_wildsmith'. In this series of results, the classifier guidance scale ranges from 0 to 30, increasing in increments of $0.02s$, an order of magnitude smaller than in the gifs above. 
 
 <p align="center"> 
-<iframe src="https://storage.googleapis.com/hodesdon-com/dove.mp4
-" width="512" height="512" frameborder="0" allowfullscreen></iframe>
+<iframe src="https://storage.googleapis.com/hodesdon-com/dove.mp4" width="512" height="512" frameborder="0" allowfullscreen></iframe>
 </p>
 
 There are 50 frames for each $s$-incremement of 1, so 50 frames from the beginning we see the results for $s=1$. This corresponds to the image about 8 seconds in: not discernibly a bird, but just before the turning point at which a bird sharply emerges. This is when the score function is
@@ -249,7 +248,10 @@ That is, at $s=1$ the score function is just the conditional denoising model sco
 Prior to this point, the images resemble a portrait of a woman: not noise, but not an image that is conditioned on the prompt either. 
 There is another jump in form 32 seconds in, which is when $s=4$. Beyond this, some more Wildsmith-like detail is added, but in general $s>10$ yields minor variations on the result with no particular improvement in quality or prompt-closeness.
 
-
+Finally, a tree in the style of Brian Wildsmith. As before, there is a turning point at around $s=1$ (8 seconds in) and a long tail of minor variationsf after the minute mark.
+<p align="center"> 
+<iframe src="https://storage.googleapis.com/hodesdon-com/tree%203_09.mp4" width="512" height="512" frameborder="0" allowfullscreen></iframe>
+</p>
 
 # Textual inversion for bias reduction
 Finally, I wanted to flag a use case of textual inversion that I haven't seen discussed beyond the original paper by Gal et al. It is well known that generative models reproduce the biases of their training data. For instance, the prompts 'doctor' and 'scientist' disproportionately produce images that resemble men. This reflects biases in the kind of images that are uploaded to image hosting sites where the training data is collected from.
