@@ -48,9 +48,9 @@ figcaption {
 # Caveats
 I don't want to start throwing around derivative images without saying something about the relationship of style-transfer results to the original creations. Its clear that style-transfer results are dependent in a strong sense on the original artist, and right that the artist's role be respected.
 
-Can AI-generated images be art? My feeling is that on the one hand, simply grabbing the output image from a generative neural network isn't producing a piece of art. However, these neural nets are tools, which can be used creatively, flexibly and imaginatively. Use always requires a user, who exercises intentionality: this means, they user their tool to achieve a certain aim. And so generative AI can be used to produce art, in an entirely anaologous way to which artists create artwork with mixed media, photography, and other methods that differ from the traditonal paint and canvas.
+Can AI-generated images be art? My feeling is that on the one hand, simply grabbing the output image from a generative neural network isn't producing a piece of art. However, these neural nets are tools, which can be used creatively, flexibly and imaginatively. Generative AI can be used to produce art, in an anaologous way to that in which artists create artwork with mixed media, photography, and other methods that differ from the traditonal paint and canvas.
 
-There are certain characteristics of art that are essential to it. One is creativity. Secondly, art is, it seems to me, essentially a form of human-to-human communication: the artist has some intention for the piece they are creating. This is why a sunset, however beautiful, is not art. So, it is possible for AI-generated media to be art, depending on the role played by the human in the process of their creation.
+There are certain characteristics of art that are essential to it. One is creativity. Secondly, art is, as I see it, essentially a form of human-to-human communication: the artist has some intention for the piece they are creating. This is why a sunset, however beautiful, is not art. So, it is possible for AI-generated media to be art, depending on the role played by the human in the process of their creation.
 
 Given this understanding of the relationship between art and generative AI, we can address worries sometimes voiced about whether generative AI is going to replace artists.
 
@@ -254,7 +254,7 @@ That is, at $s=1$ the score function is just the conditional denoising model sco
 Prior to this point, the images resemble a portrait of a woman: not noise, but not an image that is conditioned on the prompt either. 
 There is another jump in form 16 seconds in, which is when $s=4$. Beyond this, some more Wildsmith-like detail is added, but in general $s>10$ yields minor variations on the result with no particular improvement in quality.
 
-Finally, a tree in the style of Brian Wildsmith. As before, the prompted imasge emerges a little after $s=1$ (4 seconds in), and there is a long tail of minor variations as $s>4$.
+Finally, a tree in the style of Brian Wildsmith. As before, the prompted image emerges a little after $s=1$ (4 seconds in), and there is a long tail of minor variations as $s>4$.
 <p align="center"> 
 <iframe src="https://storage.googleapis.com/hodesdon-com/blender/tree.mp4" width="512" height="512" frameborder="0" allowfullscreen></iframe>
 </p>
