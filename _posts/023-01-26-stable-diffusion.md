@@ -75,8 +75,7 @@ My dataset was around 300 images I scanned from Brian Wildsmith books and found 
 
 Images were cropped to 512x512. One hurdle was how to programmatically crop the images in a way that preserved features of interest. Centre-cropping meant that the resulting models generated images missing the tops of heads. For speed, I used a feature of the webui to programatically crop [based on detected focal point](https://github.com/AUTOMATIC1111/stable-diffusion-webui/pull/3139) in combination with splitting large images into smaller, overlapping tiles, but this was not entirely satisfactory.
 
-
-To generate the embedding, I used 16 vectors per token rather than the default of 1, because there are lots of different aspects of the training set I wanted to capture and represent with my new token (use of geometric patterns, textures, colour combinations etc). Increasing the value yielded improvements in texture, for instance, enabling the representation of brushstrokes, as shown in examples below.
+The work was done with permission of the Wildsmith family.
 
 ## Results
 Here's a couple of images that were generated randomly during training of the new embedding. 
